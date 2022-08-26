@@ -242,3 +242,46 @@ class NN3Dby2DTSM(NN3Dby2D):
             out = self.layer(xs_tsm.view(B * L, C, H, W))
             _, C_, H_, W_ = out.shape
             return out.view(B, L, C_, H_, W_).transpose(1, 2)
+
+
+class VanillaConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, group=1, bias=True,
+                 norm="SN", activation=nn.LeakyReLU(0.2, inplace=True), conv_by='3d'):
+        super(VanillaConv, self).__init__()
+        if conv_by == '2d':
+            self.module = NN3Dby2D
+        elif conv_by == '2dtsm':
+            self.module = NN3Dby2DTSM
+        elif conv_by == '3d':
+            self.module = torch.nn
+        else:
+            raise NotImplementedError('conv_by {} is not implemented'.format(conv_by))
+
+        self.padding = tuple(((np.array(kernel_size) - 1) * np.array(dilation)) // 2) if padding == -1 else padding
+        self.featureConv = self.module.Conv3d(in_channels, out_channels, kernel_size, stride, self.padding, dilation,
+                                              group, bias)
+
+        self.norm = norm
+        if norm == "BN":
+            self.norm_layer = self.module.BatchNorm3d(out_channels)
+        elif norm == "IN":
+            self.norm_layer = self.module.InstanceNorm3d(out_channels, track_running_stats=True)
+        elif norm == "SN":
+            self.norm = None
+            self.featureConv = nn.utils.spectral_norm(self.featureConv)
+        elif norm is None:
+            raise NotImplementedError('Norm type {} not implemented'.format(norm))
+
+        self.activation = activation
+
+    def forward(self, xs):
+
+        out = self.featureConv(xs)
+        if self.activation:
+            out = self.activation(out)
+        if self.norm is not None:
+            out = self.norm_layer(out)
+
+        return out
+
+
