@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="24d17211-a440-4fd9-8866-47d482ac29e8" name="1080Ti-时空融合DeBug">
+        <fileTransfer accessType="SFTP" host="region-7.autodl.com" port="15119" sshConfigId="0173bac7-8ab5-4c97-9b18-226aa5874b22" sshConfig="root@region-7.autodl.com:15119 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

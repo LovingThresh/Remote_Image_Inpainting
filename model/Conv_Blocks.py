@@ -268,6 +268,8 @@ class VanillaConv(nn.Module):
             self.norm = None
             self.featureConv = nn.utils.spectral_norm(self.featureConv)
         elif norm is None:
+            self.norm = None
+        else:
             raise NotImplementedError('Norm type {} not implemented'.format(norm))
 
         self.activation = activation
@@ -316,7 +318,7 @@ class GatedConv(VanillaConv):
         out = self.sigmoid(mask)
         if self.store_gated_values:
             self.gated_values = out.detach().cpu()
-            return out
+        return out
 
     def forward(self, xs):
         gating = self.gatingConv(xs)
