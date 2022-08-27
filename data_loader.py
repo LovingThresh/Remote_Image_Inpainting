@@ -4,11 +4,20 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : data_loader.py
 # @Software: PyCharm
+import os
 import cv2
 import math
 import random
 import numpy as np
 from PIL import Image, ImageDraw
+
+from torch.utils.data.dataset import Dataset
+
+OUTPUT_ROOT_DIR_NAMES = [
+    'masked_frames',
+    'result_frames',
+    'optical_flows'
+]
 
 
 # 生成条纹噪音
@@ -27,7 +36,7 @@ def get_stripe_noise(image, angle, strength=0.2):
     rotated_noise = cv2.warpAffine(g_noise, M, (w, h))
 
     crop_noise = rotated_noise[center[0] - int(image_w / 2):center[0] + int(image_w / 2),
-                                center[1] - int(image_h / 2):center[1] + int(image_h / 2)]
+                 center[1] - int(image_h / 2):center[1] + int(image_h / 2)]
 
     crop_noise = np.expand_dims(crop_noise, axis=-1).repeat(3, axis=-1).astype(np.uint8)
     assert crop_noise.shape == (image_w, image_h, c)
@@ -123,7 +132,8 @@ def get_video_masks_by_moving_random_stroke(
     return masks
 
 
-def get_random_stroke_control_points(imageWidth, imageHeight, nVertexBound=(10, 10), maxHeadSpeed=10, maxHeadAcceleration=(5, 0.5),
+def get_random_stroke_control_points(imageWidth, imageHeight, nVertexBound=(10, 10), maxHeadSpeed=10,
+                                     maxHeadAcceleration=(5, 0.5),
                                      boarderGap=20, maxInitSpeed=10):
     """
     Implementation the free-form training masks generating algorithm
@@ -198,12 +208,11 @@ def random_accelerate(velocity, maxAcceleration, dist='uniform'):
 
 
 def draw_mask_by_control_points(mask, Xs, Ys, brushWidth, fill=255):
-
     radius = brushWidth // 2 + 1
 
     for i in range(1, len(Xs)):
         draw = ImageDraw.Draw(mask)
-        startX, startY = Xs[i-1], Ys[i-1]
+        startX, startY = Xs[i - 1], Ys[i - 1]
         nextX, nextY = Xs[i], Ys[i]
         draw.line((startX, startY) + (nextX, nextY), fill=fill, width=brushWidth)
 
@@ -258,3 +267,102 @@ def get_masked_ratio(mask):
     """
     hist = mask.histogram()
     return hist[0] / np.prod(mask.size)
+
+
+# Dataset Module
+def make_dirs(dir_name):
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+
+def make_dir_under_root(root_dir, name):
+    full_dir_name = os.path.join(root_dir, name)
+    make_dirs(full_dir_name)
+    return full_dir_name
+
+
+def read_dirnames_under_root(root_dir, skip_list=None):
+    if skip_list is None:
+        skip_list = []
+    dirnames = [
+        name for i, name in enumerate(sorted(os.listdir(root_dir)))
+        if (os.path.isdir(os.path.join(root_dir, name))
+            and name not in skip_list
+            and i not in skip_list)
+    ]
+    print(f"Reading directories under {root_dir}, exclude {skip_list}, num: {len(dirnames)}")
+    return dirnames
+
+
+class RootInputDirectories:
+
+    def __init__(
+            self,
+            root_videos_dir,
+            root_masks_dir,
+            video_names_filename=None
+    ):
+        self.root_videos_dir = root_videos_dir
+        self.root_masks_dir = root_masks_dir
+        if video_names_filename is not None:
+            with open(video_names_filename, 'r') as fin:
+                self.video_dirnames = [
+                    os.path.join(root_videos_dir, line.split()[0])
+                    for line in fin.readlines()
+                ]
+
+        else:
+            self.video_dirnames = read_dirnames_under_root(root_videos_dir)
+        self.mask_dirnames = read_dirnames_under_root(root_masks_dir)
+
+    def __len__(self):
+        return len(self.video_dirnames)
+
+
+class RootOutputDirectories:
+
+    def __init__(
+            self, root_outputs_dir,
+    ):
+        self.output_root_dirs = {}
+        for name in OUTPUT_ROOT_DIR_NAMES:
+            self.output_root_dirs[name] = \
+                make_dir_under_root(root_outputs_dir, name)
+
+    def __getattr__(self, attr):
+        if attr in self.output_root_dirs:
+            return self.output_root_dirs[attr]
+        else:
+            raise KeyError(
+                f"{attr} not in root_dir_names {self.output_root_dirs}")
+
+
+# Get Dataset
+class FrameAndMaskDataset(Dataset):
+    def __init__(self,
+                 rids: RootInputDirectories,
+                 rods: RootOutputDirectories,
+                 args: dict):
+        self.rids = rids
+        self.video_dirnames = rids.video_dirnames
+        self.mask_dirnames = rids.mask_dirnames
+        self.rods = rods
+
+        self.sample_length = args['sample_length']
+        self.random_sample = args['random_sample']
+        self.random_sample_mask = args['random_sample_mask']
+        self.random_sample_period_max = args.get('random_sample_period_max', 1)
+
+        self.guidance = args.get('guidance', 'none')
+        self.sigma = args.get('edge_sigma', 2)
+
+        self.size = self.w, self.h = args['w'], args['h']
+        self.mask_type = args['mask_type']
+
+        self.do_augment = args.get('do_augment', False)
+        self.skip_last = args.get('skip_last', False)
+
+        self.mask_dilation = args.get('mask_dilation', 0)
+
+
+
