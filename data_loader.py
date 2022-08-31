@@ -76,31 +76,59 @@ def get_light_spot(image, center=(200, 200), radius_scale=0.05):
 # 生成遮挡掩膜
 # From Free-Form-Video-Inpainting
 def get_video_masks_by_moving_random_stroke(
-        video_len, imageWidth=320, imageHeight=180, nStroke=5, nVertexBound=[10, 30], maxHeadSpeed=15,
-        maxHeadAcceleration=(15, 0.5), brushWidthBound=(5, 20), boarderGap=None, nMovePointRatio=0.5, maxPointMove=10,
-        maxLineAcceleration=5, maxInitSpeed=5):
-    """
-        Get video masks by random strokes which move randomly between each
-        frame, including the whole stroke and its control points
+    video_len, imageWidth=320, imageHeight=180, nStroke=5,
+    nVertexBound=[10, 30], maxHeadSpeed=15, maxHeadAcceleration=(15, 0.5),
+    brushWidthBound=(5, 20), boarderGap=None, nMovePointRatio=0.5, maxPointMove=10,
+    maxLineAcceleration=5, maxInitSpeed=5
+):
+    '''
+    Get video masks by random strokes which move randomly between each
+    frame, including the whole stroke and its control points
 
-        Parameters
-        ----------
-        video_len : Video Length
+    Parameters
+    ----------
         imageWidth: Image width
         imageHeight: Image height
-        nStroke: Number of drawn lines
+        nStroke: Number of drawed lines
         nVertexBound: Lower/upper bound of number of control points for each line
         maxHeadSpeed: Max head speed when creating control points
-        maxHeadAcceleration: Max acceleration applying on the current head point (a head point and its velocity decides the next point)
+        maxHeadAcceleration: Max acceleration applying on the current head point (
+            a head point and its velosity decides the next point)
         brushWidthBound (min, max): Bound of width for each stroke
-        boarderGap: The minimum gap between image boarder and drawn lines
+        boarderGap: The minimum gap between image boarder and drawed lines
         nMovePointRatio: The ratio of control points to move for next frames
         maxPointMove: The magnitude of movement for control points for next frames
-        maxLineAcceleration: The magnitude of acceleration for the whole l
-    """
-    assert (video_len >= 1)
+        maxLineAcceleration: The magnitude of acceleration for the whole line
+
+    Examples
+    ----------
+        object_like_setting = {
+            "nVertexBound": [5, 20],
+            "maxHeadSpeed": 15,
+            "maxHeadAcceleration": (15, 3.14),
+            "brushWidthBound": (30, 50),
+            "nMovePointRatio": 0.5,
+            "maxPiontMove": 10,
+            "maxLineAcceleration": (5, 0.5),
+            "boarderGap": 20,
+            "maxInitSpeed": 10,
+        }
+        rand_curve_setting = {
+            "nVertexBound": [10, 30],
+            "maxHeadSpeed": 20,
+            "maxHeadAcceleration": (15, 0.5),
+            "brushWidthBound": (3, 10),
+            "nMovePointRatio": 0.5,
+            "maxPiontMove": 3,
+            "maxLineAcceleration": (5, 0.5),
+            "boarderGap": 20,
+            "maxInitSpeed": 6
+        }
+        get_video_masks_by_moving_random_stroke(video_len=5, nStroke=3, **object_like_setting)
+    '''
+    assert(video_len >= 1)
+
     # Initialize a set of control points to draw the first mask
-    # create a new canvas
     mask = Image.new(mode='1', size=(imageWidth, imageHeight), color=1)
     control_points_set = []
     for i in range(nStroke):
@@ -132,20 +160,51 @@ def get_video_masks_by_moving_random_stroke(
     return masks
 
 
-def get_random_stroke_control_points(imageWidth, imageHeight, nVertexBound=(10, 10), maxHeadSpeed=10,
-                                     maxHeadAcceleration=(5, 0.5),
-                                     boarderGap=20, maxInitSpeed=10):
-    """
+def random_accelerate(velocity, maxAcceleration, dist='uniform'):
+    speed, angle = velocity
+    d_speed, d_angle = maxAcceleration
+
+    if dist == 'uniform':
+        speed += np.random.uniform(-d_speed, d_speed)
+        angle += np.random.uniform(-d_angle, d_angle)
+    elif dist == 'guassian':
+        speed += np.random.normal(0, d_speed / 2)
+        angle += np.random.normal(0, d_angle / 2)
+    else:
+        raise NotImplementedError(f'Distribution type {dist} is not supported.')
+
+    return (speed, angle)
+
+
+def random_move_control_points(Xs, Ys, lineVelocity, nMovePointRatio, maxPiontMove, maxLineAcceleration, boarderGap=15):
+    new_Xs = Xs.copy()
+    new_Ys = Ys.copy()
+
+    # move the whole line and accelerate
+    speed, angle = lineVelocity
+    new_Xs += int(speed * np.cos(angle))
+    new_Ys += int(speed * np.sin(angle))
+    lineVelocity = random_accelerate(lineVelocity, maxLineAcceleration, dist='guassian')
+
+    # choose points to move
+    chosen = np.arange(len(Xs))
+    np.random.shuffle(chosen)
+    chosen = chosen[:int(len(Xs) * nMovePointRatio)]
+    for i in chosen:
+        new_Xs[i] += np.random.randint(-maxPiontMove, maxPiontMove)
+        new_Ys[i] += np.random.randint(-maxPiontMove, maxPiontMove)
+    return new_Xs, new_Ys
+
+
+def get_random_stroke_control_points(
+    imageWidth, imageHeight,
+    nVertexBound=(10, 30), maxHeadSpeed=10, maxHeadAcceleration=(5, 0.5), boarderGap=20,
+    maxInitSpeed=10
+):
+    '''
     Implementation the free-form training masks generating algorithm
-    :param imageWidth:
-    :param imageHeight:
-    :param nVertexBound:
-    :param maxHeadSpeed:
-    :param maxHeadAcceleration:
-    :param boarderGap:
-    :param maxInitSpeed:
-    :return:
-    """
+    proposed by JIAHUI YU et al. in "Free-Form Image Inpainting with Gated Convolution"
+    '''
     startX = np.random.randint(imageWidth)
     startY = np.random.randint(imageHeight)
     Xs = [startX]
@@ -157,15 +216,13 @@ def get_random_stroke_control_points(imageWidth, imageHeight, nVertexBound=(10, 
     speed = np.random.uniform(0, maxHeadSpeed)
 
     for i in range(numVertex):
-        # 设置Acceleration加速度
         speed, angle = random_accelerate((speed, angle), maxHeadAcceleration)
         speed = np.clip(speed, 0, maxHeadSpeed)
 
         nextX = startX + speed * np.cos(angle)
         nextY = startY + speed * np.sin(angle)
 
-        # 保证mask在一定的边界内
-        if boarderGap is None:
+        if boarderGap is not None:
             nextX = np.clip(nextX, boarderGap, imageWidth - boarderGap)
             nextY = np.clip(nextY, boarderGap, imageHeight - boarderGap)
 
@@ -187,59 +244,22 @@ def get_random_velocity(max_speed, dist='uniform'):
         raise NotImplementedError(f'Distribution type {dist} is not supported.')
 
     angle = np.random.uniform(0, 2 * np.pi)
-
-    return speed, angle
-
-
-def random_accelerate(velocity, maxAcceleration, dist='uniform'):
-    speed, angle = velocity
-    d_speed, d_angle = maxAcceleration
-
-    if dist == 'uniform':
-        speed += np.random.randint(-d_speed, d_speed)
-        angle += np.random.randint(-d_angle, d_angle)
-    elif dist == 'guassian':
-        speed += np.random.normal(-d_speed, d_speed)
-        angle += np.random.normal(-d_angle, d_angle)
-    else:
-        raise NotImplementedError(f'Distribution type {dist} is not supported.')
-
     return speed, angle
 
 
 def draw_mask_by_control_points(mask, Xs, Ys, brushWidth, fill=255):
-    radius = brushWidth // 2 + 1
-
+    radius = brushWidth // 2 - 1
     for i in range(1, len(Xs)):
         draw = ImageDraw.Draw(mask)
         startX, startY = Xs[i - 1], Ys[i - 1]
         nextX, nextY = Xs[i], Ys[i]
         draw.line((startX, startY) + (nextX, nextY), fill=fill, width=brushWidth)
-
     for x, y in zip(Xs, Ys):
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=fill)
-
     return mask
 
 
-def random_move_control_points(Xs, Ys, lineVelocity, nMovePointRatio, maxPiontMove, maxLineAcceleration, boarderGap=15):
-    new_Xs = Xs.copy()
-    new_Ys = Ys.copy()
-
-    # move the whole line and accelerate
-    speed, angle = lineVelocity
-    new_Xs += int(speed * np.cos(angle))
-    new_Ys += int(speed * np.sin(angle))
-    lineVelocity = random_accelerate(lineVelocity, maxLineAcceleration, dist='guassian')
-
-    chosen = np.arange(len(Xs))
-    np.random.shuffle(chosen)
-    for i in chosen:
-        new_Xs[i] += np.random.randint(-maxPiontMove, maxPiontMove)
-        new_Ys[i] += np.random.randint(-maxPiontMove, maxPiontMove)
-    return new_Xs, new_Ys
-
-
+# modified from https://github.com/naoto0804/pytorch-inpainting-with-partial-conv/blob/master/generate_data.py
 def get_random_walk_mask(imageWidth=320, imageHeight=180, length=None):
     action_list = [[0, 1], [0, -1], [1, 0], [-1, 0]]
     canvas = np.zeros((imageHeight, imageWidth)).astype("i")
@@ -365,4 +385,71 @@ class FrameAndMaskDataset(Dataset):
         self.mask_dilation = args.get('mask_dilation', 0)
 
 
+# 先进行数据划分
+# 先确定数据划分的原则
+# 首先对一张1024*1023的图像进行插值，使其变为1024*1024，随机按照时间抽取12张图像进行抽取，每一轮抽取24组
+# 思考两种策略×两种策略：①全部受损；②50%受损—————①随机图；②随机线 我们只需要256×256的mask即可
+
+object_like_setting = {
+            "nVertexBound": [5, 20],
+            "maxHeadSpeed": 15,
+            "maxHeadAcceleration": (15, 3.14),
+            "brushWidthBound": (30, 50),
+            "nMovePointRatio": 0.5,
+            "maxPointMove": 10,
+            "maxLineAcceleration": (5, 0.5),
+            "boarderGap": 20,
+            "maxInitSpeed": 10,
+        }
+
+rand_curve_setting = {
+    "nVertexBound": [10, 30],
+    "maxHeadSpeed": 20,
+    "maxHeadAcceleration": (15, 0.5),
+    "brushWidthBound": (3, 10),
+    "nMovePointRatio": 0.5,
+    "maxPointMove": 3,
+    "maxLineAcceleration": (5, 0.5),
+    "boarderGap": 20,
+    "maxInitSpeed": 6
+}
+
+
+def get_mask_schedule_All():
+    for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train'):
+        os.makedirs(
+            r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'/choice_images_mask_ALL')
+        for i in range(24):
+            save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'/choice_images_mask_ALL\{}/'.format(i)
+            os.makedirs(save_path)
+            choice_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'\choice_images/' + str(i)
+            choice_file_list = os.listdir(choice_path)
+            seed = np.random.uniform(0, 1, 1)
+            nStroke_seed = np.random.randint(1, 5)
+            for m in range(12):
+                if seed > 0.5:
+                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256, nStroke=nStroke_seed, **object_like_setting)
+                else:
+                    mask = get_video_masks_by_moving_random_stroke(video_len=1, nStroke=nStroke_seed, **rand_curve_setting)
+                mask[0].save(save_path + choice_file_list[m][:-4] + '.png')
+
+
+# get_mask_schedule_All()
+
+for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public'):
+    path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'\images_masked/'
+    file_list = os.listdir(path)
+    os.makedirs(
+        r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images')
+    for i in range(24):
+        save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images\{}/'.format(i)
+        os.makedirs(save_path)
+
+        choice_from_list = np.random.choice(file_list, 12, replace=False)
+        choice_from_list = list(choice_from_list)
+        choice_from_list.sort(key=file_list.index)
+        for file in choice_from_list:
+            img = cv2.imread(path + file)
+            img = cv2.resize(img, (1024, 1024))
+            cv2.imwrite(save_path + file, img)
 
