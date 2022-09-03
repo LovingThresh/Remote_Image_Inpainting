@@ -85,7 +85,7 @@ d_s_args = {
     "use_sigmoid": True,
     "norm": "SN",
     "conv_type": "vanilla",
-    'conv_by': '2d'}
+    "conv_by": "3d"}
 
 d_t_args = {
     "nf": 64,

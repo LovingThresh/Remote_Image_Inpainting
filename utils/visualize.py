@@ -77,11 +77,11 @@ def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epo
 
     a = next(iter(train_loader))
     i = 1
-    input_tensor = a[0][0 + i: 1 + i]
+    input_tensor = a['input_tensors'][0][0:1].numpy()
     if mode == 'image':
-        output_tensor = a[1][0 + i:1 + i]
+        output_tensor = a['gt_tensors'][0][0:1].numpy()
     else:
-        output_tensor = a[2][0 + i:1 + i]
+        output_tensor = a['gt_masks'][0][0:1].numpy()
 
     input_size = (input_tensor.shape[2], input_tensor.shape[3])
     crop_size  = (output_tensor.shape[2], output_tensor.shape[3])

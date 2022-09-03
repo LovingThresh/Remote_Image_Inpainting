@@ -294,7 +294,7 @@ transformer = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
     A.RandomRotate90(p=0.5),
-    A.RandomCrop(64, 64)
+    A.RandomCrop(128, 128)
 ])
 
 
@@ -409,25 +409,21 @@ rand_curve_setting = {
 
 
 def get_mask_schedule_All():
-    for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public'):
-        os.makedirs(
-            r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images_mask_ALL')
+    for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train'):
+        # os.makedirs(
+        #     r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images_mask_ALL')
         for i in range(24):
-            save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images_mask_ALL\{}/'.format(
+            save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'/choice_images_mask_ALL\{}/'.format(
                 i)
-            os.makedirs(save_path)
-            choice_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'\choice_images/' + str(
+            # os.makedirs(save_path)
+            choice_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'\choice_images/' + str(
                 i)
             choice_file_list = os.listdir(choice_path)
             seed = np.random.uniform(0, 1, 1)
-            nStroke_seed = np.random.randint(1, 5)
+            nStroke_seed = np.random.randint(2, 6)
             for m in range(12):
-                if seed > 0.5:
-                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256,
+                mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256,
                                                                    nStroke=nStroke_seed, **object_like_setting)
-                else:
-                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256,
-                                                                   nStroke=nStroke_seed, **rand_curve_setting)
                 mask[0].save(save_path + choice_file_list[m][:-4] + '.png')
 
 # get_mask_schedule_All()

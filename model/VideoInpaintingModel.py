@@ -410,9 +410,9 @@ class VideoInpaintingModel_S(BaseModel):
         input_imgs = torch.cat([imgs, masks, guidances], dim=2)
         # merge temporal dimension to batch dimension
         in_shape = list(input_imgs.shape)
-        input_imgs = input_imgs.view([in_shape[0] * in_shape[1]] + in_shape[2:])
-        output = self.spatial_discriminator(input_imgs, False)
+        # input_imgs = input_imgs.view([in_shape[0] * in_shape[1]] + in_shape[2:])
+        output = self.spatial_discriminator(input_imgs)
         # split batch and temporal dimension
-        output = output.view(in_shape[0], in_shape[1], -1)
+        # output = output.view(in_shape[0], in_shape[1], -1)
 
         return output
