@@ -4,20 +4,20 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : data_loader.py
 # @Software: PyCharm
+import glob
 import os
 import cv2
 import math
+import torch
 import random
 import numpy as np
+import albumentations as A
+from utils.visualize import visualize_pair
 from PIL import Image, ImageDraw
-
+from skimage.feature import canny
+from skimage.color import rgb2gray
+from torchvision import transforms
 from torch.utils.data.dataset import Dataset
-
-OUTPUT_ROOT_DIR_NAMES = [
-    'masked_frames',
-    'result_frames',
-    'optical_flows'
-]
 
 
 # 生成条纹噪音
@@ -76,10 +76,10 @@ def get_light_spot(image, center=(200, 200), radius_scale=0.05):
 # 生成遮挡掩膜
 # From Free-Form-Video-Inpainting
 def get_video_masks_by_moving_random_stroke(
-    video_len, imageWidth=320, imageHeight=180, nStroke=5,
-    nVertexBound=[10, 30], maxHeadSpeed=15, maxHeadAcceleration=(15, 0.5),
-    brushWidthBound=(5, 20), boarderGap=None, nMovePointRatio=0.5, maxPointMove=10,
-    maxLineAcceleration=5, maxInitSpeed=5
+        video_len, imageWidth=320, imageHeight=180, nStroke=5,
+        nVertexBound=[10, 30], maxHeadSpeed=15, maxHeadAcceleration=(15, 0.5),
+        brushWidthBound=(5, 20), boarderGap=None, nMovePointRatio=0.5, maxPointMove=10,
+        maxLineAcceleration=5, maxInitSpeed=5
 ):
     '''
     Get video masks by random strokes which move randomly between each
@@ -89,13 +89,13 @@ def get_video_masks_by_moving_random_stroke(
     ----------
         imageWidth: Image width
         imageHeight: Image height
-        nStroke: Number of drawed lines
+        nStroke: Number of drawn lines
         nVertexBound: Lower/upper bound of number of control points for each line
         maxHeadSpeed: Max head speed when creating control points
         maxHeadAcceleration: Max acceleration applying on the current head point (
-            a head point and its velosity decides the next point)
+            a head point and its velocity decides the next point)
         brushWidthBound (min, max): Bound of width for each stroke
-        boarderGap: The minimum gap between image boarder and drawed lines
+        boarderGap: The minimum gap between image boarder and drawn lines
         nMovePointRatio: The ratio of control points to move for next frames
         maxPointMove: The magnitude of movement for control points for next frames
         maxLineAcceleration: The magnitude of acceleration for the whole line
@@ -108,7 +108,7 @@ def get_video_masks_by_moving_random_stroke(
             "maxHeadAcceleration": (15, 3.14),
             "brushWidthBound": (30, 50),
             "nMovePointRatio": 0.5,
-            "maxPiontMove": 10,
+            "maxPointMove": 10,
             "maxLineAcceleration": (5, 0.5),
             "boarderGap": 20,
             "maxInitSpeed": 10,
@@ -119,14 +119,14 @@ def get_video_masks_by_moving_random_stroke(
             "maxHeadAcceleration": (15, 0.5),
             "brushWidthBound": (3, 10),
             "nMovePointRatio": 0.5,
-            "maxPiontMove": 3,
+            "maxPointMove": 3,
             "maxLineAcceleration": (5, 0.5),
             "boarderGap": 20,
             "maxInitSpeed": 6
         }
         get_video_masks_by_moving_random_stroke(video_len=5, nStroke=3, **object_like_setting)
     '''
-    assert(video_len >= 1)
+    assert (video_len >= 1)
 
     # Initialize a set of control points to draw the first mask
     mask = Image.new(mode='1', size=(imageWidth, imageHeight), color=1)
@@ -197,9 +197,9 @@ def random_move_control_points(Xs, Ys, lineVelocity, nMovePointRatio, maxPiontMo
 
 
 def get_random_stroke_control_points(
-    imageWidth, imageHeight,
-    nVertexBound=(10, 30), maxHeadSpeed=10, maxHeadAcceleration=(5, 0.5), boarderGap=20,
-    maxInitSpeed=10
+        imageWidth, imageHeight,
+        nVertexBound=(10, 30), maxHeadSpeed=10, maxHeadAcceleration=(5, 0.5), boarderGap=20,
+        maxInitSpeed=10
 ):
     '''
     Implementation the free-form training masks generating algorithm
@@ -289,100 +289,93 @@ def get_masked_ratio(mask):
     return hist[0] / np.prod(mask.size)
 
 
-# Dataset Module
-def make_dirs(dir_name):
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-
-
-def make_dir_under_root(root_dir, name):
-    full_dir_name = os.path.join(root_dir, name)
-    make_dirs(full_dir_name)
-    return full_dir_name
-
-
-def read_dirnames_under_root(root_dir, skip_list=None):
-    if skip_list is None:
-        skip_list = []
-    dirnames = [
-        name for i, name in enumerate(sorted(os.listdir(root_dir)))
-        if (os.path.isdir(os.path.join(root_dir, name))
-            and name not in skip_list
-            and i not in skip_list)
-    ]
-    print(f"Reading directories under {root_dir}, exclude {skip_list}, num: {len(dirnames)}")
-    return dirnames
-
-
-class RootInputDirectories:
-
-    def __init__(
-            self,
-            root_videos_dir,
-            root_masks_dir,
-            video_names_filename=None
-    ):
-        self.root_videos_dir = root_videos_dir
-        self.root_masks_dir = root_masks_dir
-        if video_names_filename is not None:
-            with open(video_names_filename, 'r') as fin:
-                self.video_dirnames = [
-                    os.path.join(root_videos_dir, line.split()[0])
-                    for line in fin.readlines()
-                ]
-
-        else:
-            self.video_dirnames = read_dirnames_under_root(root_videos_dir)
-        self.mask_dirnames = read_dirnames_under_root(root_masks_dir)
-
-    def __len__(self):
-        return len(self.video_dirnames)
-
-
-class RootOutputDirectories:
-
-    def __init__(
-            self, root_outputs_dir,
-    ):
-        self.output_root_dirs = {}
-        for name in OUTPUT_ROOT_DIR_NAMES:
-            self.output_root_dirs[name] = \
-                make_dir_under_root(root_outputs_dir, name)
-
-    def __getattr__(self, attr):
-        if attr in self.output_root_dirs:
-            return self.output_root_dirs[attr]
-        else:
-            raise KeyError(
-                f"{attr} not in root_dir_names {self.output_root_dirs}")
+# transform
+transformer = A.Compose([
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.RandomRotate90(p=0.5),
+    A.RandomCrop(256, 256)
+])
 
 
 # Get Dataset
-class FrameAndMaskDataset(Dataset):
-    def __init__(self,
-                 rids: RootInputDirectories,
-                 rods: RootOutputDirectories,
-                 args: dict):
-        self.rids = rids
-        self.video_dirnames = rids.video_dirnames
-        self.mask_dirnames = rids.mask_dirnames
-        self.rods = rods
+class VideoFrameAndMaskDataset(Dataset):
 
-        self.sample_length = args['sample_length']
-        self.random_sample = args['random_sample']
-        self.random_sample_mask = args['random_sample_mask']
-        self.random_sample_period_max = args.get('random_sample_period_max', 1)
+    def __init__(
+            self,
+            data_path: str,
+            input_frame_dir: str,
+            input_mask_dir: str,
+            size: tuple,
+            transform=transformer
+    ):
 
-        self.guidance = args.get('guidance', 'none')
-        self.sigma = args.get('edge_sigma', 2)
+        self.input_frame_dir = os.path.join(data_path, input_frame_dir)
+        self.input_mask_dir = os.path.join(data_path, input_mask_dir)
+        self.transform = transform
+        self.guidance = "edge"
+        self.sigma = 2
+        self.size = self.w, self.h = size
+        self.do_augment = True
+        self.input_frame_dir_list = glob.glob(self.input_frame_dir)
+        self.input_mask_dir_list = glob.glob(self.input_mask_dir)
 
-        self.size = self.w, self.h = args['w'], args['h']
-        self.mask_type = args['mask_type']
+    def __len__(self):
+        return len(self.input_frame_dir_list)
 
-        self.do_augment = args.get('do_augment', False)
-        self.skip_last = args.get('skip_last', False)
+    def _process_files(self, files):
 
-        self.mask_dilation = args.get('mask_dilation', 0)
+        gt_frames = np.asarray([cv2.cvtColor(cv2.imread(os.path.join(files[0], i)), cv2.COLOR_BGR2RGB) for i in os.listdir(files[0])], dtype=np.uint8)
+        gt_frames = gt_frames.swapaxes(0, 1)
+        gt_frames = gt_frames.swapaxes(1, 2)
+        gt_frames = gt_frames.swapaxes(2, 3)
+        masks = np.asarray([cv2.resize(cv2.imread(os.path.join(files[1], i), cv2.IMREAD_GRAYSCALE), (256, 256), interpolation=cv2.INTER_NEAREST) for i in os.listdir(files[1])],
+                           dtype=np.uint8)
+        masks = masks / 255
+        masks = masks.swapaxes(0, 1)
+        masks = masks.swapaxes(1, 2)
+        if self.do_augment:
+            transformed = self.transform(image=gt_frames, mask=masks)
+            gt_frames, masks = transformed['image'], transformed['mask']
+
+        gt_frames = gt_frames.swapaxes(2, 3)
+        gt_frames = gt_frames.swapaxes(1, 2)
+        gt_frames = gt_frames.swapaxes(0, 1)
+
+        masks = masks.swapaxes(1, 2)
+        masks = masks.swapaxes(0, 1)
+        # Edge guidance
+        guidances = []
+        assert self.guidance == "edge"
+        for frame in gt_frames:
+            edge = canny(rgb2gray(frame), sigma=self.sigma)
+            edge = edge.astype(np.uint8)
+            guidances.append(edge)
+        guidances = np.asarray(guidances)
+        guidances = torch.tensor(guidances).unsqueeze(1)
+
+        # To tensors
+        gt_tensors = [transforms.ToTensor()(i) for i in gt_frames]
+        gt_tensors = [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(i) for i in gt_tensors]
+        gt_tensors = torch.stack(gt_tensors, dim=0)
+        mask_tensors = torch.tensor(masks).unsqueeze(1)
+
+        del frame, gt_frames, masks, edge
+        # Mask input
+        input_tensors = gt_tensors * mask_tensors
+
+        return {
+            "input_tensors": input_tensors,
+            "mask_tensors": mask_tensors,
+            "gt_tensors": gt_tensors,
+            "guidances": guidances
+        }
+
+    def __getitem__(self, index):
+        video_name = self.input_frame_dir_list[index]
+        mask_name = self.input_mask_dir_list[index]
+        files = (video_name, mask_name)
+        return self._process_files(files)
 
 
 # 先进行数据划分
@@ -391,16 +384,16 @@ class FrameAndMaskDataset(Dataset):
 # 思考两种策略×两种策略：①全部受损；②50%受损—————①随机图；②随机线 我们只需要256×256的mask即可
 
 object_like_setting = {
-            "nVertexBound": [5, 20],
-            "maxHeadSpeed": 15,
-            "maxHeadAcceleration": (15, 3.14),
-            "brushWidthBound": (30, 50),
-            "nMovePointRatio": 0.5,
-            "maxPointMove": 10,
-            "maxLineAcceleration": (5, 0.5),
-            "boarderGap": 20,
-            "maxInitSpeed": 10,
-        }
+    "nVertexBound": [5, 20],
+    "maxHeadSpeed": 15,
+    "maxHeadAcceleration": (15, 3.14),
+    "brushWidthBound": (30, 50),
+    "nMovePointRatio": 0.5,
+    "maxPointMove": 10,
+    "maxLineAcceleration": (5, 0.5),
+    "boarderGap": 20,
+    "maxInitSpeed": 10,
+}
 
 rand_curve_setting = {
     "nVertexBound": [10, 30],
@@ -416,40 +409,42 @@ rand_curve_setting = {
 
 
 def get_mask_schedule_All():
-    for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train'):
+    for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public'):
         os.makedirs(
-            r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'/choice_images_mask_ALL')
+            r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images_mask_ALL')
         for i in range(24):
-            save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'/choice_images_mask_ALL\{}/'.format(i)
+            save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images_mask_ALL\{}/'.format(
+                i)
             os.makedirs(save_path)
-            choice_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_train\train/' + j + r'\choice_images/' + str(i)
+            choice_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'\choice_images/' + str(
+                i)
             choice_file_list = os.listdir(choice_path)
             seed = np.random.uniform(0, 1, 1)
             nStroke_seed = np.random.randint(1, 5)
             for m in range(12):
                 if seed > 0.5:
-                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256, nStroke=nStroke_seed, **object_like_setting)
+                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256,
+                                                                   nStroke=nStroke_seed, **object_like_setting)
                 else:
-                    mask = get_video_masks_by_moving_random_stroke(video_len=1, nStroke=nStroke_seed, **rand_curve_setting)
+                    mask = get_video_masks_by_moving_random_stroke(video_len=1, imageWidth=256, imageHeight=256,
+                                                                   nStroke=nStroke_seed, **rand_curve_setting)
                 mask[0].save(save_path + choice_file_list[m][:-4] + '.png')
-
 
 # get_mask_schedule_All()
 
-for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public'):
-    path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'\images_masked/'
-    file_list = os.listdir(path)
-    os.makedirs(
-        r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images')
-    for i in range(24):
-        save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images\{}/'.format(i)
-        os.makedirs(save_path)
-
-        choice_from_list = np.random.choice(file_list, 12, replace=False)
-        choice_from_list = list(choice_from_list)
-        choice_from_list.sort(key=file_list.index)
-        for file in choice_from_list:
-            img = cv2.imread(path + file)
-            img = cv2.resize(img, (1024, 1024))
-            cv2.imwrite(save_path + file, img)
-
+# for j in os.listdir(r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public'):
+#     path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'\images_masked/'
+#     file_list = os.listdir(path)
+#     os.makedirs(
+#         r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images')
+#     for i in range(24):
+#         save_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_test_public\test_public/' + j + r'/choice_images\{}/'.format(i)
+#         os.makedirs(save_path)
+#
+#         choice_from_list = np.random.choice(file_list, 12, replace=False)
+#         choice_from_list = list(choice_from_list)
+#         choice_from_list.sort(key=file_list.index)
+#         for file in choice_from_list:
+#             img = cv2.imread(path + file)
+#             img = cv2.resize(img, (1024, 1024))
+#             cv2.imwrite(save_path + file, img)
