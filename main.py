@@ -157,11 +157,14 @@ eval_function_G = {'eval_function_psnr': eval_function_psnr,
                    }
 
 
-optimizer_ft_D = optim.Adam(discriminator_T.parameters(), lr=lr, betas=(0.5, 0.999))
+optimizer_ft_D_T = optim.Adam(discriminator_T.parameters(), lr=lr, betas=(0.5, 0.999))
+optimizer_ft_D_S = optim.Adam(discriminator_S.parameters(), lr=lr, betas=(0.5, 0.999))
+
 optimizer_ft_G = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
 
 
-exp_lr_scheduler_D = lr_scheduler.StepLR(optimizer_ft_D, step_size=10, gamma=0.8)
+exp_lr_scheduler_D_T = lr_scheduler.StepLR(optimizer_ft_D_T, step_size=10, gamma=0.8)
+exp_lr_scheduler_D_S = lr_scheduler.StepLR(optimizer_ft_D_S, step_size=10, gamma=0.8)
 exp_lr_scheduler_G = lr_scheduler.StepLR(optimizer_ft_G, step_size=10, gamma=0.8)
 
 # ===============================================================================
@@ -188,7 +191,7 @@ if Checkpoint:
 # ===============================================================================
 
 
-train_GAN(generator, discriminator_S, optimizer_ft_G, optimizer_ft_D,
-          loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D,
+train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
+          loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
           eval_function_G, val_loader, val_loader, Epochs, device, threshold,
           output_dir, train_writer, val_writer, experiment, train_comet)
