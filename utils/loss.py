@@ -56,7 +56,7 @@ class ReconLoss(nn.Module):
         self.loss_fn = nn.L1Loss(reduction=reduction)
         self.masked = masked
 
-    def forward(self, data_input, model_output):
+    def forward(self, model_output, data_input):
         outputs = model_output['outputs']
         targets = data_input['targets']
         if self.masked:
@@ -81,7 +81,7 @@ class VGGLoss(nn.Module):
         )
         return loss
 
-    def forward(self, data_input, model_output):
+    def forward(self, model_output, data_input):
         targets = data_input['targets']
         outputs = model_output['outputs']
 
@@ -137,7 +137,7 @@ class StyleLoss(nn.Module):
             loss += self.l1_loss(output_gram_matrix, target_gram_matrix) / C_P_square_divider
         return loss
 
-    def forward(self, data_input, model_output):
+    def forward(self, model_output, data_input):
         targets = data_input['targets']
         outputs = model_output['outputs']
 
@@ -149,7 +149,7 @@ class StyleLoss(nn.Module):
             )
 
         mean_image_loss = torch.stack(mean_image_loss, dim=0).mean(dim=0)
-        return mean_image_loss
+        return mean_image_loss * 1000
 
 
 device = torch.device("cuda")
@@ -178,7 +178,7 @@ class EdgeLoss(nn.Module):
         loss = self.l1_loss(output_edge, gt_edge)
         return loss, output_edge, gt_edge
 
-    def forward(self, data_input, model_output):
+    def forward(self, model_output, data_input):
         targets = data_input['targets']
         outputs = model_output['outputs']
 

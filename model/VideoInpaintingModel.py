@@ -9,7 +9,7 @@ import torch
 import logging
 import numpy as np
 import torch.nn as nn
-from Conv_Blocks import (
+from model.Conv_Blocks import (
     GatedConv, GatedDeconv,
     PartialConv, PartialDeconv,
     VanillaConv, VanillaDeconv)
@@ -315,9 +315,12 @@ class SNTemporalPatchGANDiscriminator(BaseModule):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, xs):
+    def forward(self, xs, mode=True):
         # B, L, C, H, W = xs.shape
-        xs_t = torch.transpose(xs, 1, 2)
+        if mode:
+            xs_t = torch.transpose(xs, 1, 2)
+        else:
+            xs_t = xs
         c1 = self.conv1(xs_t)
         c2 = self.conv2(c1)
         c3 = self.conv3(c2)
@@ -369,7 +372,7 @@ class VideoInpaintingModel_G(BaseModel):
 class VideoInpaintingModel_T(BaseModel):
     def __init__(self, d_t_args=None):
         super().__init__()
-
+        self.d_t_args = d_t_args
         #################
         # Discriminator #
         #################
@@ -391,12 +394,12 @@ class VideoInpaintingModel_T(BaseModel):
 class VideoInpaintingModel_S(BaseModel):
     def __init__(self, d_s_args=None):
         super().__init__()
-
+        self.d_s_args = d_s_args
         #################
         # Discriminator #
         #################
 
-        self.spatial_discriminator = SNTemporalPatchGANDiscriminator(nc_in=5, conv_type='2d', **self.d_s_args)
+        self.spatial_discriminator = SNTemporalPatchGANDiscriminator(nc_in=5, **self.d_s_args)
 
     def forward(self, imgs, masks, guidances=None):
         # imgs: [B, L, C=3, H, W]
@@ -408,7 +411,7 @@ class VideoInpaintingModel_S(BaseModel):
         # merge temporal dimension to batch dimension
         in_shape = list(input_imgs.shape)
         input_imgs = input_imgs.view([in_shape[0] * in_shape[1]] + in_shape[2:])
-        output = self.spatial_discriminator(input_imgs)
+        output = self.spatial_discriminator(input_imgs, False)
         # split batch and temporal dimension
         output = output.view(in_shape[0], in_shape[1], -1)
 

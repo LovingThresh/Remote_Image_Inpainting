@@ -173,7 +173,7 @@ def random_accelerate(velocity, maxAcceleration, dist='uniform'):
     else:
         raise NotImplementedError(f'Distribution type {dist} is not supported.')
 
-    return (speed, angle)
+    return speed, angle
 
 
 def random_move_control_points(Xs, Ys, lineVelocity, nMovePointRatio, maxPiontMove, maxLineAcceleration, boarderGap=15):
@@ -294,7 +294,7 @@ transformer = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
     A.RandomRotate90(p=0.5),
-    A.RandomCrop(256, 256)
+    A.RandomCrop(64, 64)
 ])
 
 
@@ -329,7 +329,7 @@ class VideoFrameAndMaskDataset(Dataset):
         gt_frames = gt_frames.swapaxes(0, 1)
         gt_frames = gt_frames.swapaxes(1, 2)
         gt_frames = gt_frames.swapaxes(2, 3)
-        masks = np.asarray([cv2.resize(cv2.imread(os.path.join(files[1], i), cv2.IMREAD_GRAYSCALE), (256, 256), interpolation=cv2.INTER_NEAREST) for i in os.listdir(files[1])],
+        masks = np.asarray([cv2.resize(cv2.imread(os.path.join(files[1], i), cv2.IMREAD_GRAYSCALE), self.size, interpolation=cv2.INTER_NEAREST) for i in os.listdir(files[1])],
                            dtype=np.uint8)
         masks = masks / 255
         masks = masks.swapaxes(0, 1)
@@ -365,10 +365,10 @@ class VideoFrameAndMaskDataset(Dataset):
         input_tensors = gt_tensors * mask_tensors
 
         return {
-            "input_tensors": input_tensors,
-            "mask_tensors": mask_tensors,
-            "gt_tensors": gt_tensors,
-            "guidances": guidances
+            "input_tensors": input_tensors.float(),
+            "mask_tensors": mask_tensors.float(),
+            "gt_tensors": gt_tensors.float(),
+            "guidances": guidances.float()
         }
 
     def __getitem__(self, index):

@@ -13,12 +13,10 @@
 from comet_ml import Experiment
 
 
-import mmcv
 import random
 import numpy as np
 
 from data_loader import VideoFrameAndMaskDataset
-from mmseg.models import BACKBONES, HEADS, LOSSES
 
 
 import torchmetrics
@@ -31,7 +29,6 @@ from torch.utils.tensorboard import SummaryWriter
 from train import *
 from utils.loss import *
 from model.VideoInpaintingModel import VideoInpaintingModel_G, VideoInpaintingModel_T, VideoInpaintingModel_S
-from utils.visualize import visualize_pair
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
@@ -52,10 +49,10 @@ torch.backends.cudnn.benchmark = False
 # seed_everything(24)
 
 hyper_params = {
-    "mode": 'video_inpainting',
+    "mode": 'Video_inpainting',
     "ex_number": '3D_Gated Convolution Model',
     "input_size": (3, 256, 256),
-    "batch_size": 4,
+    "batch_size": 1,
     "learning_rate": 1e-4,
     "epochs": 200,
     "threshold": 28,
@@ -71,7 +68,6 @@ mode = hyper_params['mode']
 Epochs = hyper_params['epochs']
 src_path = hyper_params['src_path']
 batch_size = hyper_params['batch_size']
-raw_size = hyper_params['raw_size'][1:]
 input_size = hyper_params['input_size'][1:]
 threshold = hyper_params['threshold']
 Checkpoint = hyper_params['checkpoint']
@@ -87,7 +83,10 @@ opti = {"norm": "SN",
 d_s_args = {
     "nf": 64,
     "use_sigmoid": True,
-    "norm": "SN"}
+    "norm": "SN",
+    "conv_type": "vanilla",
+    'conv_by': '2d'}
+
 d_t_args = {
     "nf": 64,
     "use_sigmoid": True,
@@ -139,7 +138,6 @@ discriminator_S = VideoInpaintingModel_S(d_s_args=d_s_args)
 
 loss_function_D = {'loss_function_dis': nn.BCELoss()}
 
-
 loss_function_G_ = {'loss_function_dis': nn.BCELoss()}
 
 loss_function_G = {
@@ -149,11 +147,13 @@ loss_function_G = {
     'EdgeLoss': EdgeLoss()
 }
 
+eval_function_l2 = torchmetrics.functional.mean_squared_error
 eval_function_psnr = torchmetrics.functional.image.psnr.peak_signal_noise_ratio
 eval_function_ssim = torchmetrics.functional.image.ssim.structural_similarity_index_measure
 
 eval_function_G = {'eval_function_psnr': eval_function_psnr,
                    'eval_function_ssim': eval_function_ssim,
+                   'eval_function_L2': eval_function_l2
                    }
 
 
@@ -188,7 +188,7 @@ if Checkpoint:
 # ===============================================================================
 
 
-train_GAN(generator, discriminator_T, optimizer_ft_G, optimizer_ft_D,
+train_GAN(generator, discriminator_S, optimizer_ft_G, optimizer_ft_D,
           loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D,
-          eval_function_G, train_loader, val_loader, Epochs, device, threshold,
+          eval_function_G, val_loader, val_loader, Epochs, device, threshold,
           output_dir, train_writer, val_writer, experiment, train_comet)

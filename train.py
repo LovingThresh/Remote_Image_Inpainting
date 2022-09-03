@@ -106,13 +106,14 @@ def calculate_eval(eval_fn, it, training_eval_sum, training_evaluation, output, 
         for k, v in eval_fn.items():
             # For Deblur
             if mode == 'image':
-                output_, target_ = (output + 1) / 2, (target + 1) / 2
+                output_, target_ = (output['outputs'] + 1) / 2, (target + 1) / 2
                 output_, target_ = output_ * 255, target_ * 255
             # For Segmentation
             else:
                 output_ = (output[:, 1, :, :].reshape(-1) > 0.5).int()
                 target_ = (target[:, 1, :, :].reshape(-1) > 0.5).int()
-            evaluation = v(output_, target_)
+            evaluation = torch.stack([v(i, j) for i, j in zip(output_, target_)], dim=0)
+            evaluation = torch.mean(evaluation)
             training_evaluation[k] = evaluation.item()
             training_eval_sum[k] += evaluation.item()
     else:
@@ -156,14 +157,13 @@ def train_generator_epoch(train_model_G, train_model_D,
         it = it + 1
         D_weight = 0.5
         optimizer_D.zero_grad()
-        real_input, real_output, real_mask = batch
-        real_input, real_output, real_mask = real_input.to(Device), real_output.to(Device), real_mask.to(Device)
-        real_input, real_output, real_mask = Variable(real_input), Variable(real_output), Variable(real_mask)
-
+        real_input, real_mask, real_output, guidances = batch['input_tensors'], batch['mask_tensors'], \
+                                                        batch['gt_tensors'], batch['guidances']
+        data_input = {'targets': real_output, 'masks': real_mask, 'guidances': guidances}
         # --------------------------------------------------------------------------------------------------------------
         # Real Training
         # real_output_pool = real_pool(real_output.data)
-        real_predict = train_model_D(real_output)
+        real_predict = train_model_D(real_output, real_mask, guidances)
         real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
         # calculate loss
         loss_D_Real, training_loss_sum_D, training_loss_D = \
@@ -181,8 +181,8 @@ def train_generator_epoch(train_model_G, train_model_D,
 
         # --------------------------------------------------------------------------------------------------------------
         # Fake Training
-        fake_output = train_model_G(real_input)
-        fake_predict = train_model_D(fake_output.detach().clone())
+        fake_output = train_model_G(real_input, real_mask, guidances)
+        fake_predict = train_model_D(fake_output['outputs'].detach().clone(), real_mask, guidances)
         fake_label = torch.zeros(fake_predict.shape, dtype=torch.float32, device=Device)
 
         # Fake Pool + calculate loss
@@ -202,7 +202,7 @@ def train_generator_epoch(train_model_G, train_model_D,
         # --------------------------------------------------------------------------------------------------------------
         # Generator Training
         optimizer_G.zero_grad()
-        gen_predict = train_model_D(fake_output)
+        gen_predict = train_model_D(fake_output['outputs'], real_mask, guidances)
 
         # calculate generator_VS_discriminator loss
         loss_G_, training_loss_sum_G, training_loss_G = \
@@ -211,7 +211,7 @@ def train_generator_epoch(train_model_G, train_model_D,
 
         # calculate generator loss
         loss_G, training_loss_sum_G, training_loss_G = \
-            calculate_loss(loss_fn_G, it, training_loss_sum_G, training_loss_G, fake_output, real_output)
+            calculate_loss(loss_fn_G, it, training_loss_sum_G, training_loss_G, fake_output, data_input)
         print(training_loss_G)
 
         # evaluate generator
@@ -281,11 +281,11 @@ def val_generator_epoch(train_model_G, train_model_D,
         train_model_G.zero_grad()
         train_model_D.zero_grad()
 
-        real_input, real_output, real_mask = batch
-        real_input, real_output, real_mask = real_input.to(Device), real_output.to(Device), real_mask.to(Device)
+        real_input, real_mask, real_output, guidances = batch['input_tensors'], batch['mask_tensors'], \
+                                                        batch['gt_tensors'], batch['guidances']
 
         # Real
-        real_predict = train_model_D(real_output)
+        real_predict = train_model_D(real_output['outputs'], real_mask, guidances)
         real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
         _, training_loss_sum_D, training_loss_D = \
             calculate_loss(loss_fn_D, it, training_loss_sum_D, training_loss_D, real_predict, real_label)
@@ -296,8 +296,8 @@ def val_generator_epoch(train_model_G, train_model_D,
         print(training_loss_D)
 
         # Fake
-        fake_output = train_model_G(real_input)
-        fake_predict = train_model_D(fake_output.detach().clone())
+        fake_output = train_model_G(real_input, real_mask, guidances)
+        fake_predict = train_model_D(fake_output['outputs'].detach().clone(), real_mask, guidances)
         fake_label = torch.zeros(fake_predict.shape, dtype=torch.float32, device=Device)
 
         _, training_loss_sum_D, training_loss_D = \
@@ -308,7 +308,7 @@ def val_generator_epoch(train_model_G, train_model_D,
         print(training_loss_D)
 
         # Generator
-        gen_predict = train_model_D(fake_output)
+        gen_predict = train_model_D(fake_output['outputs'], real_mask, guidances)
         loss_G_, training_loss_sum_G, training_loss_G = \
             calculate_loss(loss_function_G_, it, training_loss_sum_G, training_loss_G, gen_predict,
                            torch.ones(gen_predict.shape, dtype=torch.float32, device=Device))
