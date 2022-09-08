@@ -309,9 +309,6 @@ def val_generator_epoch(train_model_G, train_model_Ds,
             real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
             _, training_loss_sum_D, training_loss_D = \
                 calculate_loss(loss_fn_D, it, training_loss_sum_D, training_loss_D, real_predict, real_label)
-            # _, training_eval_sum_D, training_evaluation_D = \
-            #     calculate_eval(eval_fn_D, it, training_eval_sum_D, training_evaluation_D_Real,
-            #                    real_output, real_label)
 
             training_loss_D = operate_dict_mean(training_loss_D, 2)
             print(training_loss_D)
@@ -324,9 +321,6 @@ def val_generator_epoch(train_model_G, train_model_Ds,
 
             _, training_loss_sum_D, training_loss_D = \
                 calculate_loss(loss_fn_D, it, training_loss_sum_D, training_loss_D, fake_predict, fake_label)
-        # _, training_eval_sum_D, training_evaluation_D = \
-        #     calculate_eval(eval_fn_D, it, training_eval_sum_D, training_evaluation_D_Fake,
-        #                    fake_output, fake_label)
             training_loss_D = operate_dict_mean(training_loss_D, 2)
             print(training_loss_D)
 
@@ -446,8 +440,8 @@ def train_GAN(training_model_G, training_model_D_T, training_model_D_S,
                 threshold_value = val_eval_G['eval_function_psnr']
 
             # 验证阶段的结果可视化
-            # save_path = os.path.join(output_dir, 'save_fig')
-            # visualize_save_pair(training_model_G, val_load, save_path, epoch)
+            save_path = os.path.join(output_dir, 'save_fig')
+            visualize_save_pair(training_model_G, val_load, save_path, epoch)
 
             if (epoch % 100) == 0:
                 save_checkpoint_path = os.path.join(output_dir, 'checkpoint')

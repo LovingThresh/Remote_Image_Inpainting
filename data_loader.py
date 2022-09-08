@@ -344,6 +344,13 @@ class VideoFrameAndMaskDataset(Dataset):
 
         masks = masks.swapaxes(1, 2)
         masks = masks.swapaxes(0, 1)
+
+        new_masks = []
+        for mask, gt_frame in zip(masks, gt_frames):
+            mask = 1 - ((mask == 0) | (gt_frame[:, :, 0] == 0))
+            new_masks.append(mask)
+        masks = np.asarray(new_masks)
+
         # Edge guidance
         guidances = []
         assert self.guidance == "edge"
