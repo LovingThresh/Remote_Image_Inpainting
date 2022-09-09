@@ -11,7 +11,6 @@ import shutil
 import datetime
 
 from accelerate import Accelerator
-from torch.autograd import Variable
 from utils.visualize import visualize_save_pair
 
 accelerator = Accelerator()
@@ -169,7 +168,6 @@ def train_generator_epoch(train_model_G, train_model_Ds,
         # real_output_pool = real_pool(real_output.data)
         loss_D_Real_Init = 0
         for train_model_D in train_model_Ds:
-
             real_predict = train_model_D(real_output, real_mask, guidances)
             real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
             # calculate loss
@@ -179,9 +177,10 @@ def train_generator_epoch(train_model_G, train_model_Ds,
             #     calculate_eval(eval_fn_D, it, training_eval_sum_D, training_evaluation_D_Real,
             #                    real_output, real_label)
             # discriminator weight
-            loss_D_Real_Init = loss_D_Real_Init + loss_D_Real * torch.tensor(D_weight, dtype=torch.float32, device=Device)
+            loss_D_Real_Init = loss_D_Real_Init + loss_D_Real * torch.tensor(D_weight, dtype=torch.float32,
+                                                                             device=Device)
 
-        # print loss_D_Real without weight
+            # print loss_D_Real without weight
 
             training_loss_D = operate_dict_mean(training_loss_D, 2)
             print('Real', training_loss_D)
@@ -201,7 +200,7 @@ def train_generator_epoch(train_model_G, train_model_Ds,
             # eval_D_Fake, training_eval_sum_D, training_evaluation_D_Fake = \
             #     calculate_eval(eval_fn_D, it + 1, training_eval_sum_D, training_evaluation_D_Fake,
             #                    fake_output, fake_label)
-            loss_D_Fake = loss_D_Fake_Init + loss_D_Fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
+            loss_D_Fake_Init = loss_D_Fake_Init + loss_D_Fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
             training_loss_D = operate_dict_mean(training_loss_D, 2)
             print('Fake', training_loss_D)
         loss_D = loss_D_Real_Init + loss_D_Fake_Init
@@ -338,7 +337,6 @@ def val_generator_epoch(train_model_G, train_model_Ds,
         _, training_eval_sum_G, training_evaluation_G = \
             calculate_eval(eval_fn_G, it, training_eval_sum_G, training_evaluation_G, fake_output, real_output,
                            mode=mode)
-        training_evaluation_G = operate_dict_mean(training_evaluation_G, 2)
         print(training_evaluation_G)
 
         training_loss_mean_D = operate_dict_mean(training_loss_sum_D, it * 2)
@@ -380,9 +378,9 @@ def train_GAN(training_model_G, training_model_D_T, training_model_D_S,
               train_load, val_load, epochs, Device,
               threshold, output_dir, train_writer_summary, valid_writer_summary,
               experiment, comet=False, init_epoch=1):
-
     training_model_G, training_model_D_T, training_model_D_S, optimizer_G, optimizer_D_T, optimizer_D_S, train_load, val_load = \
-        accelerator.prepare(training_model_G, training_model_D_T, training_model_D_S, optimizer_G, optimizer_D_T, optimizer_D_S, train_load, val_load)
+        accelerator.prepare(training_model_G, training_model_D_T, training_model_D_S, optimizer_G, optimizer_D_T,
+                            optimizer_D_S, train_load, val_load)
 
     training_model_D = [training_model_D_T, training_model_D_S]
     optimizer_D = [optimizer_D_T, optimizer_D_S]
@@ -408,10 +406,11 @@ def train_GAN(training_model_G, training_model_D_T, training_model_D_S,
             training_model_G.train(True)
             training_model_D_T.train(True)
             training_model_D_S.train(True)
-            val_loss_D, val_eval_D, val_loss_G, val_eval_G, valid_dict = \
-                val_generator_epoch(training_model_G, training_model_D,
-                                    val_load, Device, loss_function_G_, loss_fn_G, loss_fn_D,
-                                    eval_fn_G, epoch, epochs)
+            with torch.no_grad():
+                val_loss_D, val_eval_D, val_loss_G, val_eval_G, valid_dict = \
+                    val_generator_epoch(training_model_G, training_model_D,
+                                        val_load, Device, loss_function_G_, loss_fn_G, loss_fn_D,
+                                        eval_fn_G, epoch, epochs)
             write_summary(train_writer_summary, valid_writer_summary, train_dict, valid_dict, step=epoch)
 
             if B_comet:
@@ -447,11 +446,14 @@ def train_GAN(training_model_G, training_model_D_T, training_model_D_S,
                 save_checkpoint_path = os.path.join(output_dir, 'checkpoint')
                 torch.save({
                     "epoch": epoch,
-                    "model_state_dict": [training_model_G.state_dict(), training_model_D_T.state_dict(), training_model_D_S.state_dict()],
+                    "model_state_dict": [training_model_G.state_dict(), training_model_D_T.state_dict(),
+                                         training_model_D_S.state_dict()],
                     "loss_fn": [loss_fn_D, loss_fn_G],
                     "eval_fn": [eval_fn_G],
-                    "lr_schedule_state_dict": [scheduler_D_T.state_dict(), scheduler_D_S.state_dict(), scheduler_G.state_dict()],
-                    "optimizer_state_dict": [optimizer_D_T.state_dict(), optimizer_D_S.state_dict(), optimizer_G.state_dict()]
+                    "lr_schedule_state_dict": [scheduler_D_T.state_dict(), scheduler_D_S.state_dict(),
+                                               scheduler_G.state_dict()],
+                    "optimizer_state_dict": [optimizer_D_T.state_dict(), optimizer_D_S.state_dict(),
+                                             optimizer_G.state_dict()]
                 }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
 
     if not comet:
