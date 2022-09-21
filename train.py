@@ -200,7 +200,8 @@ def train_generator_epoch(train_model_G, train_model_Ds,
             # eval_D_Fake, training_eval_sum_D, training_evaluation_D_Fake = \
             #     calculate_eval(eval_fn_D, it + 1, training_eval_sum_D, training_evaluation_D_Fake,
             #                    fake_output, fake_label)
-            loss_D_Fake_Init = loss_D_Fake_Init + loss_D_Fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
+            loss_D_Fake_Init = loss_D_Fake_Init + loss_D_Fake * torch.tensor(D_weight, dtype=torch.float32,
+                                                                             device=Device)
             training_loss_D = operate_dict_mean(training_loss_D, 2)
             print('Fake', training_loss_D)
         loss_D = loss_D_Real_Init + loss_D_Fake_Init

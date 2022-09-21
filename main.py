@@ -10,6 +10,8 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : main.py
 # @Software: PyCharm
+import os
+
 from comet_ml import Experiment
 
 
@@ -56,10 +58,10 @@ hyper_params = {
     "learning_rate": 1e-4,
     "epochs": 200,
     "threshold": 28,
-    "checkpoint": False,
+    "checkpoint": True,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Video_Inpainting',
-    "check_path": 'F:/BJM/Remote_Image_Inpainting/2022-08-24-14-59-27.160160/save_model/Epoch_10_eval_16.614881643454233.pt'
+    "check_path": 'Epoch_21_eval_30.351640562216442.pth'
 }
 
 experiment = object
@@ -118,10 +120,16 @@ val_path = r'O:\Dataset\multitemporal-urban-development\archive_2\SN7_buildings_
 val_input_dir = r'*\choice_images\*'
 val_mask_dir = r'*\choice_images_mask_ALL\*'
 
+test_path = r'O:\Project\Remote_Image_Inpainting\Test/'
+test_dir = r'crop_image\*'
+test_mask_dir = r'crop_mask\*'
+
 train_dataset = VideoFrameAndMaskDataset(path, input_dir, mask_dir, (256, 256))
 val_dataset = VideoFrameAndMaskDataset(val_path, val_input_dir, val_mask_dir, (256, 256))
+test_dataset = VideoFrameAndMaskDataset(test_path, test_dir, test_mask_dir, (256, 256))
 train_loader = data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
+test_loader = data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
 # ===============================================================================
 # =                                     Model                                   =
@@ -191,7 +199,12 @@ if Checkpoint:
 # ===============================================================================
 
 
-train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
-          loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
-          eval_function_G, train_loader, val_loader, Epochs, device, threshold,
-          output_dir, train_writer, val_writer, experiment, train_comet)
+# train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
+#           loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
+#           eval_function_G, train_loader, val_loader, Epochs, device, threshold,
+#           output_dir, train_writer, val_writer, experiment, train_comet)
+save_path = output_dir + '/test_fig'
+os.mkdir(save_path)
+generator = generator.cuda()
+with torch.no_grad():
+    visualize_save_pair(generator, test_loader, save_path, epoch=1)

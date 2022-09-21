@@ -291,10 +291,7 @@ def get_masked_ratio(mask):
 
 # transform
 transformer = A.Compose([
-    A.HorizontalFlip(p=0.5),
-    A.VerticalFlip(p=0.5),
-    A.RandomRotate90(p=0.5),
-    A.RandomCrop(128, 128)
+    A.HorizontalFlip(p=0.),
 ])
 
 
@@ -355,7 +352,8 @@ class VideoFrameAndMaskDataset(Dataset):
         guidances = []
         assert self.guidance == "edge"
         for frame in gt_frames:
-            edge = canny(rgb2gray(frame), sigma=self.sigma)
+            # edge = canny(rgb2gray(frame), sigma=self.sigma)
+            edge = canny(rgb2gray(gt_frames[0]), sigma=self.sigma)
             edge = edge.astype(np.uint8)
             guidances.append(edge)
         guidances = np.asarray(guidances)

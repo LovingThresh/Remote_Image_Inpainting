@@ -77,55 +77,56 @@ def visualize_pair(train_loader, input_size, plot_switch=True, mode='image'):
 
 def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epoch, num=0, mode='image'):
 
-    a = next(iter(train_loader))  # dict: B T C H W
-    i = 1
-    input_tensor = a['input_tensors'][0].cpu().numpy()
-    output_tensor = a['gt_tensors'][0].cpu().numpy()
-    mask_tensor_numpy = a['mask_tensors'][0].cpu().numpy()
+    # a = next(iter(train_loader))  # dict: B T C H W
+    for a in train_loader:
+        i = 1
+        input_tensor = a['input_tensors'][0].cpu().numpy()
+        output_tensor = a['gt_tensors'][0].cpu().numpy()
+        mask_tensor_numpy = a['mask_tensors'][0].cpu().numpy()
 
-    input_size = (input_tensor.shape[2], input_tensor.shape[3])
-    crop_size  = (output_tensor.shape[2], output_tensor.shape[3])
+        input_size = (input_tensor.shape[2], input_tensor.shape[3])
+        crop_size  = (output_tensor.shape[2], output_tensor.shape[3])
 
-    input_tensor_numpy_Temporal = input_tensor
-    os.mkdir('{}/{}_input'.format(save_path, epoch + num))
-    for number, input_tensor_numpy in enumerate(input_tensor_numpy_Temporal):
-        input_tensor_numpy = input_tensor_numpy.transpose(1, 2, 0)
-        input_tensor_numpy = input_tensor_numpy.reshape(input_size[0], input_size[1], 3)
-        input_tensor_numpy = cv2.cvtColor(input_tensor_numpy, cv2.COLOR_BGR2RGB)
-        input_tensor_numpy = (input_tensor_numpy + 1) / 2
-        cv2.imwrite('{}/{}_input/{}.png'.format(save_path, epoch + num, number), np.uint8(input_tensor_numpy * 255))
+        input_tensor_numpy_Temporal = input_tensor
+        os.mkdir('{}/{}_input'.format(save_path, epoch + num))
+        for number, input_tensor_numpy in enumerate(input_tensor_numpy_Temporal):
+            input_tensor_numpy = input_tensor_numpy.transpose(1, 2, 0)
+            input_tensor_numpy = input_tensor_numpy.reshape(input_size[0], input_size[1], 3)
+            input_tensor_numpy = cv2.cvtColor(input_tensor_numpy, cv2.COLOR_BGR2RGB)
+            input_tensor_numpy = (input_tensor_numpy + 1) / 2
+            cv2.imwrite('{}/{}_input/{}.png'.format(save_path, epoch + num, number), np.uint8(input_tensor_numpy * 255))
 
-    output_tensor_numpy = output_tensor
-    output_tensor_numpy_Temporal = output_tensor_numpy.transpose(0, 2, 3, 1)
-    os.mkdir('{}/{}_outputs'.format(save_path, epoch + num))
-    for number, output_tensor_numpy in enumerate(output_tensor_numpy_Temporal):
+        output_tensor_numpy = output_tensor
+        output_tensor_numpy_Temporal = output_tensor_numpy.transpose(0, 2, 3, 1)
+        os.mkdir('{}/{}_outputs'.format(save_path, epoch + num))
+        for number, output_tensor_numpy in enumerate(output_tensor_numpy_Temporal):
 
-        output_tensor_numpy = output_tensor_numpy.reshape(crop_size[0], crop_size[1], 3)
-        output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_BGR2RGB)
-        output_tensor_numpy = (output_tensor_numpy + 1) / 2
-        cv2.imwrite('{}/{}_outputs/{}.png'.format(save_path, epoch + num, number), np.uint8(output_tensor_numpy * 255))
+            output_tensor_numpy = output_tensor_numpy.reshape(crop_size[0], crop_size[1], 3)
+            output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_BGR2RGB)
+            output_tensor_numpy = (output_tensor_numpy + 1) / 2
+            cv2.imwrite('{}/{}_outputs/{}.png'.format(save_path, epoch + num, number), np.uint8(output_tensor_numpy * 255))
 
-    mask_tensor_numpy_Temporal = mask_tensor_numpy.transpose(0, 2, 3, 1)
-    os.mkdir('{}/{}_masks'.format(save_path, epoch + num))
-    for number, mask_tensor_numpy in enumerate(mask_tensor_numpy_Temporal):
-        mask_tensor_numpy = mask_tensor_numpy.reshape(crop_size[0], crop_size[1])
-        mask_tensor_numpy = mask_tensor_numpy
-        cv2.imwrite('{}/{}_masks/{}.png'.format(save_path, epoch + num, number), np.uint8(mask_tensor_numpy * 255))
+        mask_tensor_numpy_Temporal = mask_tensor_numpy.transpose(0, 2, 3, 1)
+        os.mkdir('{}/{}_masks'.format(save_path, epoch + num))
+        for number, mask_tensor_numpy in enumerate(mask_tensor_numpy_Temporal):
+            mask_tensor_numpy = mask_tensor_numpy.reshape(crop_size[0], crop_size[1])
+            mask_tensor_numpy = mask_tensor_numpy
+            cv2.imwrite('{}/{}_masks/{}.png'.format(save_path, epoch + num, number), np.uint8(mask_tensor_numpy * 255))
 
-    val_model.train(True)
-    os.mkdir('{}/{}_predictions'.format(save_path, epoch + num))
-    predict_tensor = val_model(a['input_tensors'][0:].cuda(), a['mask_tensors'][0:].cuda(), a['guidances'][0:].cuda())
-    predict_tensor_numpy = predict_tensor['outputs'][0].detach().cpu().numpy()
-    predict_tensor_numpy_Temporal = predict_tensor_numpy.transpose(0, 2, 3, 1)
-    for number, predict_tensor_numpy in enumerate(predict_tensor_numpy_Temporal):
-        if predict_tensor_numpy.shape[-1] == 2:
-            predict_tensor_numpy = predict_tensor_numpy[:, :, :, 1:].repeat(3, axis=-1)
-        predict_tensor_numpy = predict_tensor_numpy.reshape(crop_size[0], crop_size[1], 3)
-        if mode == 'image':
-            predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_RGB2BGR)
-            predict_tensor_numpy = (predict_tensor_numpy + 1) / 2
-        cv2.imwrite('{}/{}_predictions/{}.png'.format(save_path, epoch + num, number), np.uint8(predict_tensor_numpy * 255))
-
+        val_model.train(True)
+        os.mkdir('{}/{}_predictions'.format(save_path, epoch + num))
+        predict_tensor = val_model(a['input_tensors'][0:].cuda(), a['mask_tensors'][0:].cuda(), a['guidances'][0:].cuda())
+        predict_tensor_numpy = predict_tensor['outputs'][0].detach().cpu().numpy()
+        predict_tensor_numpy_Temporal = predict_tensor_numpy.transpose(0, 2, 3, 1)
+        for number, predict_tensor_numpy in enumerate(predict_tensor_numpy_Temporal):
+            if predict_tensor_numpy.shape[-1] == 2:
+                predict_tensor_numpy = predict_tensor_numpy[:, :, :, 1:].repeat(3, axis=-1)
+            predict_tensor_numpy = predict_tensor_numpy.reshape(crop_size[0], crop_size[1], 3)
+            if mode == 'image':
+                predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_RGB2BGR)
+                predict_tensor_numpy = (predict_tensor_numpy + 1) / 2
+            cv2.imwrite('{}/{}_predictions/{}.png'.format(save_path, epoch + num, number), np.uint8(predict_tensor_numpy * 255))
+        num = num + 1
 
 def image2tensor(image_path):
 
