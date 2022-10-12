@@ -56,7 +56,7 @@ hyper_params = {
     "input_size": (3, 256, 256),
     "batch_size": 1,
     "learning_rate": 1e-4,
-    "epochs": 200,
+    "epochs": 1,
     "threshold": 28,
     "checkpoint": True,
     "Img_Recon": True,
@@ -121,8 +121,8 @@ val_input_dir = r'*\choice_images\*'
 val_mask_dir = r'*\choice_images_mask_ALL\*'
 
 test_path = r'O:\Project\Remote_Image_Inpainting\Test/'
-test_dir = r'crop_image\*'
-test_mask_dir = r'crop_mask\*'
+test_dir = r'crop_image_cloud\*'
+test_mask_dir = r'crop_mask_cloud\*'
 
 train_dataset = VideoFrameAndMaskDataset(path, input_dir, mask_dir, (256, 256))
 val_dataset = VideoFrameAndMaskDataset(val_path, val_input_dir, val_mask_dir, (256, 256))

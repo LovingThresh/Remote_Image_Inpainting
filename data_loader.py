@@ -344,7 +344,8 @@ class VideoFrameAndMaskDataset(Dataset):
 
         new_masks = []
         for mask, gt_frame in zip(masks, gt_frames):
-            mask = 1 - ((mask == 0) | (gt_frame[:, :, 0] == 0))
+            # mask = 1 - ((mask == 0) | (gt_frame[:, :, 0] == 0))
+            mask = 1 - (mask == 0)
             new_masks.append(mask)
         masks = np.asarray(new_masks)
 
@@ -353,7 +354,7 @@ class VideoFrameAndMaskDataset(Dataset):
         assert self.guidance == "edge"
         for frame in gt_frames:
             # edge = canny(rgb2gray(frame), sigma=self.sigma)
-            edge = canny(rgb2gray(gt_frames[0]), sigma=self.sigma)
+            edge = canny(rgb2gray(gt_frames[4]), sigma=self.sigma)
             edge = edge.astype(np.uint8)
             guidances.append(edge)
         guidances = np.asarray(guidances)

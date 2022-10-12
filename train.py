@@ -397,12 +397,13 @@ def train_GAN(training_model_G, training_model_D_T, training_model_D_S,
             training_model_G.train(True)
             training_model_D_T.train(True)
             training_model_D_S.train(True)
-            train_loss_D, train_eval_D, train_loss_G, train_eval_G, train_dict = \
-                train_generator_epoch(training_model_G, training_model_D,
-                                      train_load, Device, loss_function_G_, loss_fn_G, loss_fn_D,
-                                      eval_fn_G, optimizer_G,
-                                      optimizer_D, scheduler_G, scheduler_D,
-                                      epoch, epochs)
+            with torch.no_grad():
+                train_loss_D, train_eval_D, train_loss_G, train_eval_G, train_dict = \
+                    train_generator_epoch(training_model_G, training_model_D,
+                                          train_load, Device, loss_function_G_, loss_fn_G, loss_fn_D,
+                                          eval_fn_G, optimizer_G,
+                                          optimizer_D, scheduler_G, scheduler_D,
+                                          epoch, epochs)
 
             training_model_G.train(True)
             training_model_D_T.train(True)
