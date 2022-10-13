@@ -291,7 +291,10 @@ def get_masked_ratio(mask):
 
 # transform
 transformer = A.Compose([
-    A.HorizontalFlip(p=0.),
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.RandomRotate90(p=0.5),
+    A.RandomCrop(256, 256)
 ])
 
 
@@ -344,7 +347,7 @@ class VideoFrameAndMaskDataset(Dataset):
 
         new_masks = []
         for mask, gt_frame in zip(masks, gt_frames):
-            # mask = 1 - ((mask == 0) | (gt_frame[:, :, 0] == 0))
+            mask = 1 - ((mask == 0) | (gt_frame[:, :, 0] == 0))
             mask = 1 - (mask == 0)
             new_masks.append(mask)
         masks = np.asarray(new_masks)

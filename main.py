@@ -155,13 +155,21 @@ loss_function_G = {
     'EdgeLoss': EdgeLoss()
 }
 
+
+def correlation(input, target):
+    input_vector =  input.reshape((1, -1))
+    target_vector = target.reshape((1, -1))
+    return torch.corrcoef(torch.cat([input_vector, target_vector], dim=0))[0, 1]
+
+
 eval_function_l2 = torchmetrics.functional.mean_squared_error
 eval_function_psnr = torchmetrics.functional.image.psnr.peak_signal_noise_ratio
 eval_function_ssim = torchmetrics.functional.image.ssim.structural_similarity_index_measure
-
+eval_function_correlation = correlation
 eval_function_G = {'eval_function_psnr': eval_function_psnr,
                    'eval_function_ssim': eval_function_ssim,
-                   'eval_function_L2': eval_function_l2
+                   'eval_function_L2': eval_function_l2,
+                   'eval_function_correlation': correlation
                    }
 
 
@@ -199,10 +207,10 @@ if Checkpoint:
 # ===============================================================================
 
 
-# train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
-#           loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
-#           eval_function_G, train_loader, val_loader, Epochs, device, threshold,
-#           output_dir, train_writer, val_writer, experiment, train_comet)
+train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
+          loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
+          eval_function_G, train_loader, val_loader, Epochs, device, threshold,
+          output_dir, train_writer, val_writer, experiment, train_comet)
 save_path = output_dir + '/test_fig'
 os.mkdir(save_path)
 generator = generator.cuda()
