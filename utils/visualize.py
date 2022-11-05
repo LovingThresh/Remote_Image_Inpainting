@@ -48,7 +48,6 @@ def visualize_model(model: torch.nn.Module, image, image_pair=False):
 
 
 def visualize_pair(train_loader, input_size, plot_switch=True, mode='image'):
-
     a = next(iter(train_loader))
 
     input_tensor_numpy = a['input_tensors'][0][0:1].numpy()
@@ -76,7 +75,6 @@ def visualize_pair(train_loader, input_size, plot_switch=True, mode='image'):
 
 
 def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epoch, num=0, mode='image'):
-
     # a = next(iter(train_loader))  # dict: B T C H W
     for a in train_loader:
         i = 1
@@ -85,7 +83,7 @@ def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epo
         mask_tensor_numpy = a['mask_tensors'][0].cpu().numpy()
 
         input_size = (input_tensor.shape[2], input_tensor.shape[3])
-        crop_size  = (output_tensor.shape[2], output_tensor.shape[3])
+        crop_size = (output_tensor.shape[2], output_tensor.shape[3])
 
         input_tensor_numpy_Temporal = input_tensor
         os.mkdir('{}/{}_input'.format(save_path, epoch + num))
@@ -100,11 +98,11 @@ def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epo
         output_tensor_numpy_Temporal = output_tensor_numpy.transpose(0, 2, 3, 1)
         os.mkdir('{}/{}_outputs'.format(save_path, epoch + num))
         for number, output_tensor_numpy in enumerate(output_tensor_numpy_Temporal):
-
             output_tensor_numpy = output_tensor_numpy.reshape(crop_size[0], crop_size[1], 3)
             output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_BGR2RGB)
             output_tensor_numpy = (output_tensor_numpy + 1) / 2
-            cv2.imwrite('{}/{}_outputs/{}.png'.format(save_path, epoch + num, number), np.uint8(output_tensor_numpy * 255))
+            cv2.imwrite('{}/{}_outputs/{}.png'.format(save_path, epoch + num, number),
+                        np.uint8(output_tensor_numpy * 255))
 
         mask_tensor_numpy_Temporal = mask_tensor_numpy.transpose(0, 2, 3, 1)
         os.mkdir('{}/{}_masks'.format(save_path, epoch + num))
@@ -115,7 +113,8 @@ def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epo
 
         val_model.train(True)
         os.mkdir('{}/{}_predictions'.format(save_path, epoch + num))
-        predict_tensor = val_model(a['input_tensors'][0:].cuda(), a['mask_tensors'][0:].cuda(), a['guidances'][0:].cuda())
+        predict_tensor = val_model(a['input_tensors'][0:].cuda(), a['mask_tensors'][0:].cuda(),
+                                   a['guidances'][0:].cuda())
         predict_tensor_numpy = predict_tensor['outputs'][0].detach().cpu().numpy()
         predict_tensor_numpy_Temporal = predict_tensor_numpy.transpose(0, 2, 3, 1)
         for number, predict_tensor_numpy in enumerate(predict_tensor_numpy_Temporal):
@@ -125,11 +124,12 @@ def visualize_save_pair(val_model: torch.nn.Module, train_loader, save_path, epo
             if mode == 'image':
                 predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_RGB2BGR)
                 predict_tensor_numpy = (predict_tensor_numpy + 1) / 2
-            cv2.imwrite('{}/{}_predictions/{}.png'.format(save_path, epoch + num, number), np.uint8(predict_tensor_numpy * 255))
+            cv2.imwrite('{}/{}_predictions/{}.png'.format(save_path, epoch + num, number),
+                        np.uint8(predict_tensor_numpy * 255))
         num = num + 1
 
-def image2tensor(image_path):
 
+def image2tensor(image_path):
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = torch.tensor(image, dtype=torch.float32)
@@ -140,7 +140,6 @@ def image2tensor(image_path):
 
 
 def tensor2array(tensor):
-
     tensor = tensor.squeeze(0)
     tensor = tensor.transpose(0, 2)
     tensor = tensor.transpose(0, 1)
