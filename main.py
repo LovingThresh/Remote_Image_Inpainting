@@ -207,10 +207,10 @@ if Checkpoint:
 # ===============================================================================
 
 
-train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
-          loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
-          eval_function_G, train_loader, val_loader, Epochs, device, threshold,
-          output_dir, train_writer, val_writer, experiment, train_comet)
+# train_GAN(generator, discriminator_T, discriminator_S, optimizer_ft_G, optimizer_ft_D_T, optimizer_ft_D_S,
+#           loss_function_G_, loss_function_G, loss_function_D, exp_lr_scheduler_G, exp_lr_scheduler_D_T, exp_lr_scheduler_D_S,
+#           eval_function_G, train_loader, val_loader, Epochs, device, threshold,
+#           output_dir, train_writer, val_writer, experiment, train_comet)
 save_path = output_dir + '/test_fig'
 os.mkdir(save_path)
 generator = generator.cuda()
